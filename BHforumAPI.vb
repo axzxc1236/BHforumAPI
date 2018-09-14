@@ -20,7 +20,7 @@ Public Class BHforumAPI
     ''' <param name="BoardID"></param>
     ''' <param name="Page"></param>
     ''' <returns></returns>
-    Function GetTopics(ByVal BoardID As UInteger, Optional ByVal Page As UInteger = 1) As List(Of Topic)
+    Public Function GetTopics(ByVal BoardID As UInteger, Optional ByVal Page As UInteger = 1) As List(Of Topic)
         'Documents:
         'http://html-agility-pack.net/select-nodes
         'https://stackoverflow.com/questions/1604471/how-can-i-find-an-element-by-css-class-with-xpath
@@ -41,7 +41,7 @@ Public Class BHforumAPI
     ''' <param name="BoardID">哈拉板ID</param>
     ''' <param name="TopicID">文章ID</param>
     ''' <returns></returns>
-    Function GetTopicByTopicID(ByVal BoardID As UInteger, ByVal TopicID As UInteger) As Topic
+    Public Function GetTopicByTopicID(ByVal BoardID As UInteger, ByVal TopicID As UInteger) As Topic
         Dim html = web.Load("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID),
             title As String
         If html.DocumentNode.SelectSingleNode("//section").Attributes.Count = 1 Then
@@ -141,7 +141,7 @@ Public Class Topic
     ''' </summary>
     ''' <param name="Page"></param>
     ''' <returns></returns>
-    Function GetPosts(Optional ByVal Page As UInteger = 1) As List(Of Post)
+    Public Function GetPosts(Optional ByVal Page As UInteger = 1) As List(Of Post)
         html.Load(client.GetStreamAsync("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID & "&page=" & Page).Result)
         Dim post As New Post,
             result As New List(Of Post)
@@ -237,7 +237,7 @@ Public Class Topic
     ''' 取得該文章裡的所有貼文，請注意這個函式執行之後會使用大量記憶體
     ''' </summary>
     ''' <returns></returns>
-    Function GetAllPosts() As List(Of Post)
+    Public Function GetAllPosts() As List(Of Post)
         Dim pageCount As UInteger = Math.Floor((ReplyCount + 1) / 20),
             result As New List(Of Post)
         If (ReplyCount + 1) Mod 20 > 0 Then
@@ -253,7 +253,7 @@ Public Class Topic
     ''' 取得桌面版的文章網址
     ''' </summary>
     ''' <returns></returns>
-    Function GetDesktopURL() As String
+    Public Function GetDesktopURL() As String
         Return "https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID
     End Function
 
@@ -261,7 +261,7 @@ Public Class Topic
     ''' 取得手機版的文章網址
     ''' </summary>
     ''' <returns></returns>
-    Function GetMobileURL() As String
+    Public Function GetMobileURL() As String
         Return "https://m.gamer.com.tw/forum/C.php?bsn=" & BoardID & "&snA=" & TopicID
     End Function
 
@@ -314,7 +314,7 @@ Public Class Post
     ''' 取得該貼文的所有留言，數量可能為0並回傳空的List
     ''' </summary>
     ''' <returns></returns>
-    Function GetComments() As List(Of Comment)
+    Public Function GetComments() As List(Of Comment)
         Dim result As New List(Of Comment)
         Dim url = "https://forum.gamer.com.tw/ajax/moreCommend.php?bsn=" & BoardID & "&snB=" & PostID & "&returnHtml=0"
         Dim comments As Linq.JObject = (New JsonSerializer).Deserialize(New JsonTextReader(New IO.StreamReader(client.GetStreamAsync(url).Result)))
@@ -332,7 +332,7 @@ Public Class Post
     ''' 取得給該貼文GP的使用者資料
     ''' </summary>
     ''' <returns></returns>
-    Function GetGPUserList() As List(Of GBPUser)
+    Public Function GetGPUserList() As List(Of GBPUser)
         'GP為0=>回傳空列表
         If GPCount = 0 Then
             Return New List(Of GBPUser)
@@ -344,7 +344,7 @@ Public Class Post
     ''' 取得給該貼文BP的使用者資料
     ''' </summary>
     ''' <returns></returns>
-    Function GetBPUserList() As List(Of GBPUser)
+    Public Function GetBPUserList() As List(Of GBPUser)
         'BP為0=>回傳空列表
         If BPCount = 0 Then
             Return New List(Of GBPUser)
