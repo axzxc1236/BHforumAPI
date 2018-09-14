@@ -4,15 +4,10 @@ Imports HtmlAgilityPack
 Imports Newtonsoft.Json
 
 Public Class BHforumAPI
-    ''' <summary>
-    ''' 取得哈拉板的文章資訊，一頁最多有30筆資料
-    ''' </summary>
-    ''' <param name="BoardID">哈拉板ID</param>
-    ''' <param name="Page">頁數，預設為1</param>
-    ''' <returns></returns>
-    ''' 
-
-    Private web As New HtmlWeb
+    Private web As New HtmlWeb,
+        cookies As New CookieContainer,
+        client As New Http.HttpClient(New Http.HttpClientHandler() With {.CookieContainer = cookies}),
+        html As New HtmlDocument
 
     ''' <summary>
     ''' 取得看板文章列表，每頁有30筆資料
@@ -51,14 +46,11 @@ Public Class BHforumAPI
             title = html.DocumentNode.SelectNodes("//section").Item(0).SelectSingleNode(".//h1").InnerText
         End If
 
-        '這裡使用WebRequest處理是因為要新增Cookie才能用巴哈的搜尋功能
-        Dim request As HttpWebRequest = WebRequest.Create("https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&forumSearchQuery=" & title)
-        request.CookieContainer = New CookieContainer()
         Dim cookieUri As New Uri("https://forum.gamer.com.tw")
-        request.CookieContainer.Add(cookieUri, New Cookie("ckFORUM_bsn", BoardID))
-        request.CookieContainer.Add(cookieUri, New Cookie("ckFORUM_stype", "title"))
-        request.CookieContainer.Add(cookieUri, New Cookie("ckFORUM_sval", WebUtility.UrlEncode(title)))
-        html.Load(New IO.StreamReader(request.GetResponse.GetResponseStream))
+        cookies.Add(cookieUri, New Cookie("ckFORUM_bsn", BoardID))
+        cookies.Add(cookieUri, New Cookie("ckFORUM_stype", "title"))
+        cookies.Add(cookieUri, New Cookie("ckFORUM_sval", WebUtility.UrlEncode(title)))
+        html.Load(client.GetStreamAsync("https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&forumSearchQuery=" & title).Result, Text.Encoding.UTF8)
         Dim nodes = html.DocumentNode.SelectNodes("//table[contains(@class, 'b-list')]/tr[contains(@class, 'b-list__row')]")
         For Each i In nodes
             If TopicID.ToString = i.SelectSingleNode("./td[contains(@class, 'b-list__summary')]/a").Attributes.Item(0).Value Then
@@ -71,8 +63,8 @@ Public Class BHforumAPI
 
     Private Function ParseTopic(TopicNode As HtmlNode) As Topic
         Dim result As New Topic With {
-            .BoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("?bsn=")(1).Split("&")(0),
-            .TopicID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").Attributes.Item(2).Value.Split("&snA=")(1).Split("&")(0),
+            .BoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("?bsn=")(1).Replace("bsn=", "").Split("&")(0),
+            .TopicID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").Attributes.Item(2).Value.Split("&snA=")(1).Replace("snA=", "").Split("&")(0),
             .AuthorID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__count__user')]/a").InnerText,
             .LastCommenterID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__user')]/a").InnerText,
             .LastCommentTime = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").InnerText,
@@ -80,11 +72,10 @@ Public Class BHforumAPI
             .IsExpertHighlight = TopicNode.SelectNodes("./a[contains(@class, 'is-expert-highlight')]") IsNot Nothing,
             .IsHighlight = TopicNode.SelectNodes(".//a[contains(@class, 'is-highlight')]") IsNot Nothing,
             .IsLocked = TopicNode.SelectNodes(".//i[contains(@class, 'icon-lock')]") IsNot Nothing,
-            .SubBoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("&subbsn=")(1).Split("&")(0),
+            .SubBoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("&subbsn=")(1).Replace("subbsn=", "").Split("&")(0),
             .ReplyCount = UShort.Parse(TopicNode.SelectNodes(".//p[contains(@class, 'b-list__count__number')]/span").Item(0).InnerText),
             .ViewCount = UInteger.Parse(TopicNode.SelectNodes(".//p[contains(@class, 'b-list__count__number')]/span").Item(1).InnerText)
         }
-        '.Title = TopicNode.SelectSingleNode(".//a[contains(@class, 'b-list__main__title')]").InnerText,
 
         '取得文章標題
         If TopicNode.HasClass("b-list__row--delete") Then
@@ -142,7 +133,7 @@ Public Class Topic
     ''' <param name="Page"></param>
     ''' <returns></returns>
     Public Function GetPosts(Optional ByVal Page As UInteger = 1) As List(Of Post)
-        html.Load(client.GetStreamAsync("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID & "&page=" & Page).Result)
+        html.Load(client.GetStreamAsync("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID & "&page=" & Page).Result, Text.Encoding.UTF8)
         Dim post As New Post,
             result As New List(Of Post)
         For Each i In html.DocumentNode.SelectNodes("//section[contains(@class, 'c-section')]")
