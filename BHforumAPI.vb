@@ -109,7 +109,7 @@ Public Class Topic
         AuthorID As String,                    '發文者ID
         LastCommenterID As String,             '最後回覆者的ID
         LastCommentTime As String,             '最後發表時間
-        IsPinned As Boolean,                   '是否至頂
+        IsPinned As Boolean,                   '是否置頂
         IsExpertHighlight As Boolean,          '是否為達人文
         IsHighlight As Boolean,                '是否為高亮文章
         IsDeleted As Boolean,                  '是否為已刪除的文章
