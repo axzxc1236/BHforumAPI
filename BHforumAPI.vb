@@ -412,8 +412,8 @@ Public Class Post
 End Class
 
 Public Class GBPUser
-    Public UserID As String,                   '使用者ID
-        UserNick As String                     '使用者暱稱  如果使用者被刪除帳號則該欄位為空
+    Public UserID As String,                   '給予G/BP的使用者ID
+        UserNick As String                     '給予G/BP的使用者暱稱  如果使用者被刪除帳號則該欄位為空
 End Class
 
 Public Class Comment
