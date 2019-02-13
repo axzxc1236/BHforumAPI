@@ -150,7 +150,12 @@ Public Class Topic
                     post.PosterGPCount = i.SelectSingleNode(".//div[contains(@class, 'usergp')]").Attributes.Item(1).Value
                     post.PosterCareer = i.SelectSingleNode(".//div[contains(@class, 'usercareer')]").Attributes.Item(1).Value
                     post.PosterRace = i.SelectSingleNode(".//div[contains(@class, 'userrace')]").Attributes.Item(1).Value
-                    post.GPCount = i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText
+                    'post.GPCount = i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText
+                    If i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText = "爆" Then
+                        post.GPCount = post.GetGPUserList.Count
+                    Else
+                        post.GPCount = i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText
+                    End If
                     post.PostTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(3).Value
                     post.ModifyTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.Replace(" 編輯", "")
                     post.IP = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(2).Value
@@ -161,6 +166,8 @@ Public Class Topic
                     If i.SelectSingleNode(".//span[contains(@class, 'postbp')]/span").InnerText = "-" Then
                         'BP數小於5不會顯示  當成數量=0
                         post.BPCount = 0
+                    ElseIf i.SelectSingleNode(".//span[contains(@class, 'postbp')]/span").InnerText = "爆" Then
+                        post.BPCount = post.GetBPUserList.Count
                     Else
                         post.BPCount = i.SelectSingleNode(".//span[contains(@class, 'postbp')]/span").InnerText
                     End If
@@ -323,10 +330,6 @@ Public Class Post
     ''' </summary>
     ''' <returns></returns>
     Public Function GetGPUserList() As List(Of GBPUser)
-        'GP為0=>回傳空列表
-        If GPCount = 0 Then
-            Return New List(Of GBPUser)
-        End If
         Return GetGBPUserList(1)
     End Function
 
@@ -335,10 +338,6 @@ Public Class Post
     ''' </summary>
     ''' <returns></returns>
     Public Function GetBPUserList() As List(Of GBPUser)
-        'BP為0=>回傳空列表
-        If BPCount = 0 Then
-            Return New List(Of GBPUser)
-        End If
         Return GetGBPUserList(2)
     End Function
 
@@ -346,19 +345,8 @@ Public Class Post
         'Mode=1  =>  取得GP資料
         'Mode=2  =>  取得BP資料
 
-        Dim result As New List(Of GBPUser)
-        Dim pageCount As UInteger
-        If mode = 1 Then
-            pageCount = Math.Floor(GPCount / 50)
-            If GPCount Mod 50 > 0 Then
-                pageCount += 1
-            End If
-        ElseIf mode = 2 Then
-            pageCount = Math.Floor(BPCount / 50)
-            If BPCount Mod 50 > 0 Then
-                pageCount += 1
-            End If
-        End If
+        Dim result As New List(Of GBPUser),
+            pagecount As UInt16 = 1
 
         Dim Data As New Dictionary(Of String, String)
         Data.Add("t", mode)
@@ -367,20 +355,25 @@ Public Class Post
         Data.Add("p", 1)
 
         Dim response As String,
-            parsedResult As Linq.JObject
+            parsedResult As Linq.JObject,
+            user As New GBPUser
 
-        For i As UInteger = 1 To pageCount
-            Data.Item("p") = i
+        While True
+            Data.Item("p") = pagecount
             response = client.PostAsync("https://forum.gamer.com.tw/ajax/GPBPlist.php", New FormUrlEncodedContent(Data)).Result.Content.ReadAsStringAsync.Result
             parsedResult = JsonConvert.DeserializeObject(response)
+            If parsedResult.Value(Of String)("status") = "F" Then
+                '已經沒有資料了
+                Exit While
+            End If
             parsedResult = JsonConvert.DeserializeObject(parsedResult("u"))
             For Each j In parsedResult
-                Dim user = New GBPUser
                 user.UserID = j.Key
                 user.UserNick = j.Value.First
                 result.Add(user)
             Next
-        Next
+            pagecount += 1
+        End While
 
         '巴哈回傳的JSON格式是最後G/BP的人在最前面  最早G/BP的人在最後面
         '我覺得應該反過來  所以呼叫了.Reverse
