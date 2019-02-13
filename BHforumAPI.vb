@@ -25,6 +25,7 @@ Public Class BHforumAPI
             result As New List(Of Topic)
         'parse data
         For Each i In nodes
+            If i.InnerHtml.Contains("<div class=""attribution"">廣告</div>") Then Continue For '跳過巴哈廣告
             result.Add(ParseTopic(i))
         Next
         Return result
@@ -55,6 +56,7 @@ Public Class BHforumAPI
         html = web.Load("https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&forumSearchQuery=" & title)
         Dim nodes = html.DocumentNode.SelectNodes("//table[contains(@class, 'b-list')]/tr[contains(@class, 'b-list__row')]")
         For Each i In nodes
+            If i.InnerHtml.Contains("<div class=""attribution"">廣告</div>") Then Continue For '跳過巴哈廣告
             If TopicID.ToString = i.SelectSingleNode("./td[contains(@class, 'b-list__summary')]/a").Attributes.Item(0).Value Then
                 Return ParseTopic(i)
             End If
@@ -65,7 +67,6 @@ Public Class BHforumAPI
 
     Private Function ParseTopic(TopicNode As HtmlNode) As Topic
         Dim result As New Topic
-        Console.WriteLine(TopicNode.InnerHtml)
         result.BoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("?bsn=")(1).Replace("bsn=", "").Split("&")(0)
         result.TopicID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").Attributes.Item(2).Value.Split("&snA=")(1).Replace("snA=", "").Split("&")(0)
         result.AuthorID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__count__user')]/a").InnerText
