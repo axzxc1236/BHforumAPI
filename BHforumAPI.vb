@@ -4,9 +4,10 @@ Imports HtmlAgilityPack
 Imports Newtonsoft.Json
 
 Public Class BHforumAPI
-    Private web As New HtmlWeb,
-        cookies As New CookieContainer,
+    Private Shared cookies As New CookieContainer,
         client As New HttpClient(New HttpClientHandler() With {.CookieContainer = cookies}),
+        cookieUri As New Uri("https://forum.gamer.com.tw"),
+        web As New HtmlWeb,
         html As HtmlDocument
 
     ''' <summary>
@@ -20,7 +21,7 @@ Public Class BHforumAPI
         'http://html-agility-pack.net/select-nodes
         'https://stackoverflow.com/questions/1604471/how-can-i-find-an-element-by-css-class-with-xpath
         Dim url As String = "https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&page=" & Page
-        html = web.Load(url)
+        html = Web.Load(url)
         Dim nodes = html.DocumentNode.SelectNodes("//tr[contains(@class, 'b-list__row')]"),
             result As New List(Of Topic)
         'parse data
@@ -38,7 +39,7 @@ Public Class BHforumAPI
     ''' <param name="TopicID">文章ID</param>
     ''' <returns></returns>
     Public Function GetTopicByTopicID(ByVal BoardID As UInteger, ByVal TopicID As UInteger) As Topic
-        html = web.Load("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID)
+        html = Web.Load("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID)
         Dim title As String
         If html.DocumentNode.SelectSingleNode("//section").Attributes.Count = 1 Then
             '有多個頁數的文章，從第二個<section>取標題
@@ -47,7 +48,6 @@ Public Class BHforumAPI
             title = html.DocumentNode.SelectSingleNode("//section[1]/div[2]/div[1]/h1").InnerText
         End If
 
-        Dim cookieUri As New Uri("https://forum.gamer.com.tw")
         cookies.Add(cookieUri, New Cookie("ckFORUM_bsn", BoardID))
         cookies.Add(cookieUri, New Cookie("ckFORUM_stype", "title"))
         cookies.Add(cookieUri, New Cookie("ckFORUM_sval", Net.WebUtility.UrlEncode(title)))
@@ -81,7 +81,7 @@ Public Class BHforumAPI
         '取得文章標題
         If TopicNode.HasClass("b-list__row--delete") Then
             '取得已刪除文章的標題
-            result.Title = web.Load(result.GetDesktopURL).DocumentNode.SelectSingleNode("//h1[contains(@class, 'c-disable__title')]").InnerText
+            result.Title = Web.Load(result.GetDesktopURL).DocumentNode.SelectSingleNode("//h1[contains(@class, 'c-disable__title')]").InnerText
             result.IsDeleted = True
         Else
             '一般的文章
@@ -119,10 +119,12 @@ Public Class Topic
         ViewCount As UInteger,                 '文章的人氣(點擊人次)  計算公式未知
         TotalGPCount As UInteger               '文章所有樓層GP數的加總  (顯示在文章列表的數字)
 
-    Private web As New HtmlWeb,
+    Private Shared web As New HtmlWeb,
         cookies As New CookieContainer,
         client As New HttpClient(New HttpClientHandler() With {.CookieContainer = cookies}),
-        html As New HtmlDocument
+        html As HtmlDocument
+
+    Public Shared saveArticleContent As Boolean = True
 
     Sub New()
         cookies.Add(New Uri("https://forum.gamer.com.tw"), New Cookie("ckFORUM_setting", "000000000000000200"))
@@ -160,7 +162,9 @@ Public Class Topic
                     post.ModifyTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.Replace(" 編輯", "")
                     post.IP = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(2).Value
                     post.Floor = i.SelectSingleNode(".//a[contains(@class, 'floor')]").Attributes.Item(2).Value
-                    post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
+                    If saveArticleContent Then
+                        post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
+                    End If
 
                     '處理BP數量
                     If i.SelectSingleNode(".//span[contains(@class, 'postbp')]/span").InnerText = "-" Then
@@ -184,7 +188,9 @@ Public Class Topic
                     post.PostID = i.Attributes.Item(1).Value.Split("_")(1)
                     post.IsDeleted = True
                     post.Floor = i.SelectSingleNode(".//div[contains(@class, 'floor')]").Attributes.Item(1).Value
-                    post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'hint')]")
+                    If saveArticleContent Then
+                        post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'hint')]")
+                    End If
                     result.Add(post)
                 End If
             ElseIf i.Attributes.Count = 3 Then
@@ -210,7 +216,9 @@ Public Class Topic
                 post.ModifyTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.Replace(" 編輯", "")
                 post.IP = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(2).Value
                 post.Floor = i.SelectSingleNode(".//a[contains(@class, 'floor')]").Attributes.Item(2).Value
-                post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
+                If saveArticleContent Then
+                    post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
+                End If
 
                 '處理BP數量
                 If i.SelectSingleNode(".//span[contains(@class, 'postbp')]/span").InnerText = "-" Then
@@ -304,7 +312,7 @@ Public Class Post
         SignatureURL As String,                '簽名檔的網址(如果沒有簽名檔則該欄位為空)
         ArticleContent As HtmlNode             '文章內容(html)
 
-    Private client As New HttpClient
+    Private Shared client As New HttpClient
 
 
     ''' <summary>
