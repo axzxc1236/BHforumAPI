@@ -6,8 +6,8 @@ Imports Newtonsoft.Json
 Public Class BHforumAPI
     Private web As New HtmlWeb,
         cookies As New CookieContainer,
-        client As New Http.HttpClient(New Http.HttpClientHandler() With {.CookieContainer = cookies}),
-        html As New HtmlDocument
+        client As New HttpClient(New HttpClientHandler() With {.CookieContainer = cookies}),
+        html As HtmlDocument
 
     ''' <summary>
     ''' 取得看板文章列表，每頁有30筆資料
@@ -15,13 +15,13 @@ Public Class BHforumAPI
     ''' <param name="BoardID"></param>
     ''' <param name="Page"></param>
     ''' <returns></returns>
-    Public Function GetTopics(ByVal BoardID As UInteger, Optional ByVal Page As UInteger = 1) As List(Of Topic)
+    Public Function GetTopics(ByVal BoardID As UInteger, Optional ByVal Page As UInteger = 1) As List(Of Topic) '平均每頁308.4ms
         'Documents:
         'http://html-agility-pack.net/select-nodes
         'https://stackoverflow.com/questions/1604471/how-can-i-find-an-element-by-css-class-with-xpath
-        Dim url As String = "https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&page=" & Page,
-            html = web.Load(url),
-            nodes = html.DocumentNode.SelectNodes("//tr[contains(@class, 'b-list__row')]"),
+        Dim url As String = "https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&page=" & Page
+        html = web.Load(url)
+        Dim nodes = html.DocumentNode.SelectNodes("//tr[contains(@class, 'b-list__row')]"),
             result As New List(Of Topic)
         'parse data
         For Each i In nodes
@@ -37,20 +37,22 @@ Public Class BHforumAPI
     ''' <param name="TopicID">文章ID</param>
     ''' <returns></returns>
     Public Function GetTopicByTopicID(ByVal BoardID As UInteger, ByVal TopicID As UInteger) As Topic
-        Dim html = web.Load("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID),
-            title As String
+        html = web.Load("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID)
+        Dim title As String
         If html.DocumentNode.SelectSingleNode("//section").Attributes.Count = 1 Then
             '有多個頁數的文章，從第二個<section>取標題
-            title = html.DocumentNode.SelectNodes("//section").Item(1).SelectSingleNode(".//h1").InnerText
+            'title = html.DocumentNode.SelectNodes("//section").Item(1).SelectSingleNode(".//h1").InnerText
+            title = html.DocumentNode.SelectSingleNode("//section[2]/div[2]/div[1]/h1").InnerText
         Else
-            title = html.DocumentNode.SelectNodes("//section").Item(0).SelectSingleNode(".//h1").InnerText
+            'title = html.DocumentNode.SelectNodes("//section").Item(0).SelectSingleNode(".//h1").InnerText
+            title = html.DocumentNode.SelectSingleNode("//section[1]/div[2]/div[1]/h1").InnerText
         End If
 
         Dim cookieUri As New Uri("https://forum.gamer.com.tw")
         cookies.Add(cookieUri, New Cookie("ckFORUM_bsn", BoardID))
         cookies.Add(cookieUri, New Cookie("ckFORUM_stype", "title"))
-        cookies.Add(cookieUri, New Cookie("ckFORUM_sval", WebUtility.UrlEncode(title)))
-        html.Load(client.GetStreamAsync("https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&forumSearchQuery=" & title).Result, Text.Encoding.UTF8)
+        cookies.Add(cookieUri, New Cookie("ckFORUM_sval", Net.WebUtility.UrlEncode(title)))
+        html = web.Load("https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&forumSearchQuery=" & title)
         Dim nodes = html.DocumentNode.SelectNodes("//table[contains(@class, 'b-list')]/tr[contains(@class, 'b-list__row')]")
         For Each i In nodes
             If TopicID.ToString = i.SelectSingleNode("./td[contains(@class, 'b-list__summary')]/a").Attributes.Item(0).Value Then
@@ -62,26 +64,25 @@ Public Class BHforumAPI
     End Function
 
     Private Function ParseTopic(TopicNode As HtmlNode) As Topic
-        Dim result As New Topic With {
-            .BoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("?bsn=")(1).Replace("bsn=", "").Split("&")(0),
-            .TopicID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").Attributes.Item(2).Value.Split("&snA=")(1).Replace("snA=", "").Split("&")(0),
-            .AuthorID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__count__user')]/a").InnerText,
-            .LastCommenterID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__user')]/a").InnerText,
-            .LastCommentTime = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").InnerText,
-            .IsPinned = TopicNode.HasClass("b-list__row--sticky"),
-            .IsExpertHighlight = TopicNode.SelectNodes("./a[contains(@class, 'is-expert-highlight')]") IsNot Nothing,
-            .IsHighlight = TopicNode.SelectNodes(".//a[contains(@class, 'is-highlight')]") IsNot Nothing,
-            .IsLocked = TopicNode.SelectNodes(".//i[contains(@class, 'icon-lock')]") IsNot Nothing,
-            .SubBoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("&subbsn=")(1).Replace("subbsn=", "").Split("&")(0),
-            .ReplyCount = UShort.Parse(TopicNode.SelectNodes(".//p[contains(@class, 'b-list__count__number')]/span").Item(0).InnerText),
-            .ViewCount = UInteger.Parse(TopicNode.SelectNodes(".//p[contains(@class, 'b-list__count__number')]/span").Item(1).InnerText)
-        }
+        Dim result As New Topic
+        Console.WriteLine(TopicNode.InnerHtml)
+        result.BoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("?bsn=")(1).Replace("bsn=", "").Split("&")(0)
+        result.TopicID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").Attributes.Item(2).Value.Split("&snA=")(1).Replace("snA=", "").Split("&")(0)
+        result.AuthorID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__count__user')]/a").InnerText
+        result.LastCommenterID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__user')]/a").InnerText
+        result.LastCommentTime = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__time__edittime')]/a").InnerText
+        result.IsPinned = TopicNode.HasClass("b-list__row--sticky")
+        result.IsExpertHighlight = TopicNode.SelectNodes("./a[contains(@class, 'is-expert-highlight')]") IsNot Nothing
+        result.IsHighlight = TopicNode.SelectNodes(".//a[contains(@class, 'is-highlight')]") IsNot Nothing
+        result.IsLocked = TopicNode.SelectNodes(".//i[contains(@class, 'icon-lock')]") IsNot Nothing
+        result.SubBoardID = TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__summary__sort')]/a").Attributes.Item(0).Value.Split("&subbsn=")(1).Replace("subbsn=", "").Split("&")(0)
+        result.ReplyCount = UShort.Parse(TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__count__number')]/span[1]").InnerText)
+        result.ViewCount = UInteger.Parse(TopicNode.SelectSingleNode(".//p[contains(@class, 'b-list__count__number')]/span[2]").InnerText)
 
         '取得文章標題
         If TopicNode.HasClass("b-list__row--delete") Then
             '取得已刪除文章的標題
-            Dim tmp2 = web.Load(result.GetDesktopURL)
-            result.Title = tmp2.DocumentNode.SelectSingleNode("//h1[contains(@class, 'c-disable__title')]").InnerText
+            result.Title = web.Load(result.GetDesktopURL).DocumentNode.SelectSingleNode("//h1[contains(@class, 'c-disable__title')]").InnerText
             result.IsDeleted = True
         Else
             '一般的文章
@@ -119,8 +120,9 @@ Public Class Topic
         ViewCount As UInteger,                 '文章的人氣(點擊人次)  計算公式未知
         TotalGPCount As UInteger               '文章所有樓層GP數的加總  (顯示在文章列表的數字)
 
-    Private cookies As New CookieContainer,
-        client As New Http.HttpClient(New Http.HttpClientHandler() With {.CookieContainer = cookies}),
+    Private web As New HtmlWeb,
+        cookies As New CookieContainer,
+        client As New HttpClient(New HttpClientHandler() With {.CookieContainer = cookies}),
         html As New HtmlDocument
 
     Sub New()
@@ -132,30 +134,29 @@ Public Class Topic
     ''' </summary>
     ''' <param name="Page"></param>
     ''' <returns></returns>
-    Public Function GetPosts(Optional ByVal Page As UInteger = 1) As List(Of Post)
-        html.Load(client.GetStreamAsync("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID & "&page=" & Page).Result, Text.Encoding.UTF8)
-        Dim post As New Post,
+    Public Function GetPosts(Optional ByVal Page As UInteger = 1) As List(Of Post)  '平均每頁250ms，此函數會觸發GC
+        html = web.Load("https://forum.gamer.com.tw/C.php?bsn=" & BoardID & "&snA=" & TopicID & "&page=" & Page)  '大約每頁花220ms讀取
+        Dim post As Post,
             result As New List(Of Post)
         For Each i In html.DocumentNode.SelectNodes("//section[contains(@class, 'c-section')]")
             If i.Attributes.Count = 2 Then '過濾掉無關的網頁元素
                 If i.Id.StartsWith("post") Then
-                    post = New Post With {
-                            .BoardID = BoardID,
-                            .PostID = i.Attributes.Item(1).Value.Split("_")(1),
-                            .isModified = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.EndsWith(" 編輯"),
-                            .PosterID = i.SelectSingleNode(".//a[contains(@class, 'userid')]").InnerText,
-                            .PosterNick = i.SelectSingleNode(".//a[contains(@class, 'username')]").InnerText,
-                            .PosterLV = i.SelectSingleNode(".//div[contains(@class, 'userlevel')]").InnerText.Split(ChrW(10))(2),
-                            .PosterGPCount = i.SelectSingleNode(".//div[contains(@class, 'usergp')]").Attributes.Item(1).Value,
-                            .PosterCareer = i.SelectSingleNode(".//div[contains(@class, 'usercareer')]").Attributes.Item(1).Value,
-                            .PosterRace = i.SelectSingleNode(".//div[contains(@class, 'userrace')]").Attributes.Item(1).Value,
-                            .GPCount = i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText,
-                            .PostTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(3).Value,
-                            .ModifyTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.Replace(" 編輯", ""),
-                            .IP = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(2).Value,
-                            .Floor = i.SelectSingleNode(".//a[contains(@class, 'floor')]").Attributes.Item(2).Value,
-                            .ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
-                        }
+                    post = New Post
+                    post.BoardID = BoardID
+                    post.PostID = i.Attributes.Item(1).Value.Split("_")(1)
+                    post.isModified = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.EndsWith(" 編輯")
+                    post.PosterID = i.SelectSingleNode(".//a[contains(@class, 'userid')]").InnerText
+                    post.PosterNick = i.SelectSingleNode(".//a[contains(@class, 'username')]").InnerText
+                    post.PosterLV = i.SelectSingleNode(".//div[contains(@class, 'userlevel')]").InnerText.Split(ChrW(10))(2)
+                    post.PosterGPCount = i.SelectSingleNode(".//div[contains(@class, 'usergp')]").Attributes.Item(1).Value
+                    post.PosterCareer = i.SelectSingleNode(".//div[contains(@class, 'usercareer')]").Attributes.Item(1).Value
+                    post.PosterRace = i.SelectSingleNode(".//div[contains(@class, 'userrace')]").Attributes.Item(1).Value
+                    post.GPCount = i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText
+                    post.PostTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(3).Value
+                    post.ModifyTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.Replace(" 編輯", "")
+                    post.IP = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(2).Value
+                    post.Floor = i.SelectSingleNode(".//a[contains(@class, 'floor')]").Attributes.Item(2).Value
+                    post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
 
                     '處理BP數量
                     If i.SelectSingleNode(".//span[contains(@class, 'postbp')]/span").InnerText = "-" Then
@@ -172,13 +173,13 @@ Public Class Topic
                     result.Add(post)
                 Else
                     '貼文已經刪除
-                    result.Add(New Post With {
-                            .BoardID = BoardID,
-                            .PostID = i.Attributes.Item(1).Value.Split("_")(1),
-                            .IsDeleted = True,
-                            .Floor = i.SelectSingleNode(".//div[contains(@class, 'floor')]").Attributes.Item(1).Value,
-                            .ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'hint')]")
-                        })
+                    post = New Post
+                    post.BoardID = BoardID
+                    post.PostID = i.Attributes.Item(1).Value.Split("_")(1)
+                    post.IsDeleted = True
+                    post.Floor = i.SelectSingleNode(".//div[contains(@class, 'floor')]").Attributes.Item(1).Value
+                    post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'hint')]")
+                    result.Add(post)
                 End If
             ElseIf i.Attributes.Count = 3 Then
                 '被摺疊的貼文
@@ -187,24 +188,23 @@ Public Class Topic
                 result.RemoveAt(result.Count - 1)
 
                 '處理貼文內容
-                post = New Post With {
-                            .BoardID = BoardID,
-                            .PostID = i.Attributes.Item(2).Value.Split("_")(1),
-                            .isFolded = True,
-                            .isModified = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.EndsWith(" 編輯"),
-                            .PosterID = i.SelectSingleNode(".//a[contains(@class, 'userid')]").InnerText,
-                            .PosterNick = i.SelectSingleNode(".//a[contains(@class, 'username')]").InnerText,
-                            .PosterLV = i.SelectSingleNode(".//div[contains(@class, 'userlevel')]").InnerText.Split(ChrW(10))(2),
-                            .PosterGPCount = i.SelectSingleNode(".//div[contains(@class, 'usergp')]").Attributes.Item(1).Value,
-                            .PosterCareer = i.SelectSingleNode(".//div[contains(@class, 'usercareer')]").Attributes.Item(1).Value,
-                            .PosterRace = i.SelectSingleNode(".//div[contains(@class, 'userrace')]").Attributes.Item(1).Value,
-                            .GPCount = i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText,
-                            .PostTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(3).Value,
-                            .ModifyTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.Replace(" 編輯", ""),
-                            .IP = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(2).Value,
-                            .Floor = i.SelectSingleNode(".//a[contains(@class, 'floor')]").Attributes.Item(2).Value,
-                            .ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
-                        }
+                post = New Post
+                post.BoardID = BoardID
+                post.PostID = i.Attributes.Item(2).Value.Split("_")(1)
+                post.isFolded = True
+                post.isModified = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.EndsWith(" 編輯")
+                post.PosterID = i.SelectSingleNode(".//a[contains(@class, 'userid')]").InnerText
+                post.PosterNick = i.SelectSingleNode(".//a[contains(@class, 'username')]").InnerText
+                post.PosterLV = i.SelectSingleNode(".//div[contains(@class, 'userlevel')]").InnerText.Split(ChrW(10))(2)
+                post.PosterGPCount = i.SelectSingleNode(".//div[contains(@class, 'usergp')]").Attributes.Item(1).Value
+                post.PosterCareer = i.SelectSingleNode(".//div[contains(@class, 'usercareer')]").Attributes.Item(1).Value
+                post.PosterRace = i.SelectSingleNode(".//div[contains(@class, 'userrace')]").Attributes.Item(1).Value
+                post.GPCount = i.SelectSingleNode(".//span[contains(@class, 'postgp')]/span").InnerText
+                post.PostTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(3).Value
+                post.ModifyTime = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").InnerText.Replace(" 編輯", "")
+                post.IP = i.SelectSingleNode(".//div[contains(@class, 'c-post__header__info')]/a").Attributes.Item(2).Value
+                post.Floor = i.SelectSingleNode(".//a[contains(@class, 'floor')]").Attributes.Item(2).Value
+                post.ArticleContent = i.SelectSingleNode(".//div[contains(@class, 'c-article__content')]")
 
                 '處理BP數量
                 If i.SelectSingleNode(".//span[contains(@class, 'postbp')]/span").InnerText = "-" Then
@@ -376,10 +376,10 @@ Public Class Post
             parsedResult = JsonConvert.DeserializeObject(response)
             parsedResult = JsonConvert.DeserializeObject(parsedResult("u"))
             For Each j In parsedResult
-                result.Add(New GBPUser With {
-                    .UserID = j.Key,
-                    .UserNick = j.Value.First
-                })
+                Dim user = New GBPUser
+                user.UserID = j.Key
+                user.UserNick = j.Value.First
+                result.Add(user)
             Next
         Next
 
