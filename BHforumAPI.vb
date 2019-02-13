@@ -42,10 +42,8 @@ Public Class BHforumAPI
         Dim title As String
         If html.DocumentNode.SelectSingleNode("//section").Attributes.Count = 1 Then
             '有多個頁數的文章，從第二個<section>取標題
-            'title = html.DocumentNode.SelectNodes("//section").Item(1).SelectSingleNode(".//h1").InnerText
             title = html.DocumentNode.SelectSingleNode("//section[2]/div[2]/div[1]/h1").InnerText
         Else
-            'title = html.DocumentNode.SelectNodes("//section").Item(0).SelectSingleNode(".//h1").InnerText
             title = html.DocumentNode.SelectSingleNode("//section[1]/div[2]/div[1]/h1").InnerText
         End If
 
@@ -53,7 +51,7 @@ Public Class BHforumAPI
         cookies.Add(cookieUri, New Cookie("ckFORUM_bsn", BoardID))
         cookies.Add(cookieUri, New Cookie("ckFORUM_stype", "title"))
         cookies.Add(cookieUri, New Cookie("ckFORUM_sval", Net.WebUtility.UrlEncode(title)))
-        html = web.Load("https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&forumSearchQuery=" & title)
+        html.LoadHtml(client.GetStringAsync("https://forum.gamer.com.tw/B.php?bsn=" & BoardID & "&forumSearchQuery=" & title).Result)
         Dim nodes = html.DocumentNode.SelectNodes("//table[contains(@class, 'b-list')]/tr[contains(@class, 'b-list__row')]")
         For Each i In nodes
             If i.InnerHtml.Contains("<div class=""attribution"">廣告</div>") Then Continue For '跳過巴哈廣告
